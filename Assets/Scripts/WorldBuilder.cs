@@ -49,6 +49,8 @@ public class WorldBuilder : MonoBehaviour
     {
         if (worldComplete)
         {
+            //TODO: fix weight point lists being evaluated as not equal when evaluated
+
             //if (!weightPoints.SequenceEqual(weightPointsLastFrame))
             //{
             //    print("sequences not equal");
@@ -62,32 +64,45 @@ public class WorldBuilder : MonoBehaviour
         }
     }
 
-    //public void MakeWorld()
-    //{
-    //    for (int w = 0; w < width; w++)
-    //    {
+    public GameObject CreateBox(Vector3 pos)
+    {
+        Vector3[] vertices = {
+            new Vector3 (0,0,0),
+            new Vector3 (1,0,0),
+            new Vector3 (1,1,0),
+            new Vector3 (0,1,0),
+            new Vector3 (0,1,1),
+            new Vector3 (1,1,1),
+            new Vector3 (1,0,1),
+            new Vector3 (0,0,1),
+        };
+        int[] triangles = {
+            0, 2, 1, //face front
+	        0, 3, 2,
+            2, 3, 4, //face top
+	        2, 4, 5,
+            1, 2, 5, //face right
+	        1, 5, 6,
+            0, 7, 4, //face left
+	        0, 4, 3,
+            5, 4, 7, //face back
+	        5, 7, 6,
+            0, 6, 7, //face bottom
+	        0, 1, 6
+        };
 
-    //        for (int h = 0; h < height; h++)
-    //        {
-    //            for (int d = 0; d < height; d++)
-    //            {
-    //                Vector3 currentPos = new Vector3(w, h, d);
-
-    //                if (true) //(CompareAgainstWeightPoints(currentPos))
-    //                {
-    //                    GameObject newCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-    //                    newCube.transform.position = new Vector3(w, h, d);
-    //                    if (mat != null)
-    //                    {
-    //                        newCube.GetComponent<MeshRenderer>().material = mat;
-    //                    }
-    //                    voxelSet.Add(newCube);
-    //                }
-    //            }
-    //        }
-    //    }
-    //    worldComplete = true;
-    //}
+        GameObject newBlock = new();
+        Mesh newMesh = newBlock.AddComponent<MeshFilter>().mesh;
+        Renderer rend = newBlock.AddComponent<MeshRenderer>();
+        rend.material = mat;
+        newMesh.Clear();
+        newMesh.vertices = vertices;
+        newMesh.triangles = triangles;
+        newMesh.Optimize();
+        newMesh.RecalculateNormals();
+        newBlock.transform.position = pos;
+        return newBlock;
+    }
 
     public void SetVisibilityByWeight()
     {
@@ -120,12 +135,16 @@ public class WorldBuilder : MonoBehaviour
             {
                 for (int d = 0; d < height; d++)
                 {
-                    GameObject newCube = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    newCube.transform.position = new Vector3(w, h, d);
-                    if (mat != null)
-                    {
-                        newCube.GetComponent<MeshRenderer>().material = mat;
-                    }
+                    //this is the first target for optimization,
+                    //  new objects shouldn't be created for each voxel,
+                    //  instead, a new set of vertices constructing a cube
+                    //  should be added to an existing mesh
+                    GameObject newCube = CreateBox(new Vector3(w, h, d)); //GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    //newCube.transform.position = new Vector3(w, h, d);
+                    //if (mat != null)
+                    //{
+                    //    newCube.GetComponent<MeshRenderer>().material = mat;
+                    //}
                     voxelSet.Add(newCube);
                 }
                 if (visualizeBuild)
@@ -137,7 +156,7 @@ public class WorldBuilder : MonoBehaviour
         }
         worldComplete = true;
         SetVisibilityByWeight();
-        yield break; 
+        yield break;
 
     }
 
