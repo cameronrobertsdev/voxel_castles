@@ -1,9 +1,10 @@
+using CDR;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using CDR;
+using UnityEngine.AI;
 
 public class WorldBuilder : MonoBehaviour
 {
@@ -12,6 +13,8 @@ public class WorldBuilder : MonoBehaviour
     public WeightPoint[] weightPoints;
 
     [Header("Dimensions")]
+
+    public int gap = 2;
 
     [Range(1, 30)]
     public int width = 10;
@@ -32,6 +35,8 @@ public class WorldBuilder : MonoBehaviour
     //flag to be set after world build finishes
     private bool worldComplete = false;
 
+    private Mesh worldMesh;
+
     private void Start()
     {
         //initializing the weightPointsLastFrame 
@@ -40,9 +45,9 @@ public class WorldBuilder : MonoBehaviour
         {
             weightPointsLastFrame[i] = new WeightPoint(0, new Vector3());
         }
-
+        worldMesh = GetComponent<MeshFilter>().mesh;
         StartCoroutine(nameof(MakeWorld));
-
+       
     }
 
     private void Update()
@@ -104,6 +109,47 @@ public class WorldBuilder : MonoBehaviour
         return newBlock;
     }
 
+    public void AddBoxToExistingMesh(Mesh m, Vector3 pos) 
+    {
+        int cvc = m.vertexCount;
+        print($"vertex count: {cvc}");
+
+        Vector3[] newVertices = {
+            new Vector3 (0,0,0) + pos,
+            new Vector3 (1,0,0) + pos,
+            new Vector3 (1,1,0) + pos,
+            new Vector3 (0,1,0) + pos,
+            new Vector3 (0,1,1) + pos,
+            new Vector3 (1,1,1) + pos,
+            new Vector3 (1,0,1) + pos,
+            new Vector3 (0,0,1) + pos
+        };
+
+        int[] newTriangles = {
+            cvc, cvc + 2,cvc +  1, //face front
+	        cvc, cvc + 3, cvc + 2,
+            cvc + 2, cvc + 3, cvc + 4, //face top
+	        cvc + 2, cvc + 4, cvc + 5,
+            cvc + 1, cvc + 2, cvc + 5, //face right
+	        cvc + 1, cvc + 5, cvc + 6,
+            cvc, cvc + 7, cvc + 4, //face left
+	        cvc, cvc + 4, cvc + 3,
+            cvc + 5, cvc + 4, cvc + 7, //face back
+	        cvc + 5, cvc + 7, cvc + 6,
+            cvc, cvc + 6, cvc + 7, //face bottom
+	        cvc, cvc + 1, cvc + 6
+        };
+
+        m.vertices = m.vertices.Concat(newVertices).ToArray();
+        
+        print($"verts after concat:{m.vertexCount}");
+
+        m.triangles = m.triangles.Concat(newTriangles).ToArray();
+        print("tris added");
+        m.Optimize();
+        m.RecalculateNormals();
+    }
+
     public void SetVisibilityByWeight()
     {
         foreach (GameObject currentVoxel in voxelSet)
@@ -129,33 +175,34 @@ public class WorldBuilder : MonoBehaviour
 
     IEnumerator MakeWorld()
     {
-        for (int w = 0; w < width; w++)
+        for (int w = 0; w < width; w += gap)
         {
-            for (int h = 0; h < height; h++)
+            for (int h = 0; h < height; h += gap)
             {
-                for (int d = 0; d < height; d++)
+                for (int d = 0; d < height; d += gap)
                 {
                     //this is the first target for optimization,
                     //  new objects shouldn't be created for each voxel,
                     //  instead, a new set of vertices constructing a cube
                     //  should be added to an existing mesh
-                    GameObject newCube = CreateBox(new Vector3(w, h, d)); //GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    //GameObject newCube = CreateBox(new Vector3(w, h, d)); //GameObject.CreatePrimitive(PrimitiveType.Sphere);
                     //newCube.transform.position = new Vector3(w, h, d);
                     //if (mat != null)
                     //{
                     //    newCube.GetComponent<MeshRenderer>().material = mat;
                     //}
-                    voxelSet.Add(newCube);
+                    //voxelSet.Add(newCube);
+                    AddBoxToExistingMesh(worldMesh, new Vector3(w,h,d));
                 }
                 if (visualizeBuild)
                 {
-                    SetVisibilityByWeight();
+                    //SetVisibilityByWeight();
                     yield return new WaitForEndOfFrame();
                 }
             }
         }
         worldComplete = true;
-        SetVisibilityByWeight();
+        //SetVisibilityByWeight();
         yield break;
 
     }
