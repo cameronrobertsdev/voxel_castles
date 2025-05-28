@@ -4,7 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.AI;
 
 public class WorldBuilder : MonoBehaviour
 {
@@ -41,11 +40,14 @@ public class WorldBuilder : MonoBehaviour
     {
         //initializing the weightPointsLastFrame 
         weightPointsLastFrame = new WeightPoint[weightPoints.Length];
-        for (int i = 0; i < 3; i++)
-        {
-            weightPointsLastFrame[i] = new WeightPoint(0, new Vector3());
-        }
+        //for (int i = 0; i < 3; i++)
+        //{
+        //    weightPointsLastFrame[i] = new WeightPoint(0, new Vector3());
+        //}
         worldMesh = GetComponent<MeshFilter>().mesh;
+        worldMesh.Clear();
+        worldMesh.vertices = new Vector3[height * width * depth * 8];
+        worldMesh.triangles = new int[height * width * depth * 36];
         StartCoroutine(nameof(MakeWorld));
        
     }
@@ -69,50 +71,10 @@ public class WorldBuilder : MonoBehaviour
         }
     }
 
-    public GameObject CreateBox(Vector3 pos)
+    public void AddBoxToExistingMesh(Vector3 pos, int voxelIndex) 
     {
-        Vector3[] vertices = {
-            new Vector3 (0,0,0),
-            new Vector3 (1,0,0),
-            new Vector3 (1,1,0),
-            new Vector3 (0,1,0),
-            new Vector3 (0,1,1),
-            new Vector3 (1,1,1),
-            new Vector3 (1,0,1),
-            new Vector3 (0,0,1),
-        };
-        int[] triangles = {
-            0, 2, 1, //face front
-	        0, 3, 2,
-            2, 3, 4, //face top
-	        2, 4, 5,
-            1, 2, 5, //face right
-	        1, 5, 6,
-            0, 7, 4, //face left
-	        0, 4, 3,
-            5, 4, 7, //face back
-	        5, 7, 6,
-            0, 6, 7, //face bottom
-	        0, 1, 6
-        };
-
-        GameObject newBlock = new();
-        Mesh newMesh = newBlock.AddComponent<MeshFilter>().mesh;
-        Renderer rend = newBlock.AddComponent<MeshRenderer>();
-        rend.material = mat;
-        newMesh.Clear();
-        newMesh.vertices = vertices;
-        newMesh.triangles = triangles;
-        newMesh.Optimize();
-        newMesh.RecalculateNormals();
-        newBlock.transform.position = pos;
-        return newBlock;
-    }
-
-    public void AddBoxToExistingMesh(Mesh m, Vector3 pos) 
-    {
-        int cvc = m.vertexCount;
-        print($"vertex count: {cvc}");
+        int vertIndex = voxelIndex * 8;
+        int tIndex = voxelIndex * 36;
 
         Vector3[] newVertices = {
             new Vector3 (0,0,0) + pos,
@@ -126,28 +88,36 @@ public class WorldBuilder : MonoBehaviour
         };
 
         int[] newTriangles = {
-            cvc, cvc + 2,cvc +  1, //face front
-	        cvc, cvc + 3, cvc + 2,
-            cvc + 2, cvc + 3, cvc + 4, //face top
-	        cvc + 2, cvc + 4, cvc + 5,
-            cvc + 1, cvc + 2, cvc + 5, //face right
-	        cvc + 1, cvc + 5, cvc + 6,
-            cvc, cvc + 7, cvc + 4, //face left
-	        cvc, cvc + 4, cvc + 3,
-            cvc + 5, cvc + 4, cvc + 7, //face back
-	        cvc + 5, cvc + 7, cvc + 6,
-            cvc, cvc + 6, cvc + 7, //face bottom
-	        cvc, cvc + 1, cvc + 6
+            voxelIndex, voxelIndex + 2,voxelIndex +  1, //face front
+	        voxelIndex, voxelIndex + 3, voxelIndex + 2,
+            voxelIndex + 2, voxelIndex + 3, voxelIndex + 4, //face top
+	        voxelIndex + 2, voxelIndex + 4, voxelIndex + 5,
+            voxelIndex + 1, voxelIndex + 2, voxelIndex + 5, //face right
+	        voxelIndex + 1, voxelIndex + 5, voxelIndex + 6,
+            voxelIndex, voxelIndex + 7, voxelIndex + 4, //face left
+	        voxelIndex, voxelIndex + 4, voxelIndex + 3,
+            voxelIndex + 5, voxelIndex + 4, voxelIndex + 7, //face back
+	        voxelIndex + 5, voxelIndex + 7, voxelIndex + 6,
+            voxelIndex, voxelIndex + 6, voxelIndex + 7, //face bottom
+	        voxelIndex, voxelIndex + 1, voxelIndex + 6
         };
+        //print($"new vertices: {newVertices.Length}");
 
-        m.vertices = m.vertices.Concat(newVertices).ToArray();
-        
-        print($"verts after concat:{m.vertexCount}");
+        for (int i = 0; i < newVertices.Length; i++)
+        {
+            //print($"{vertIndex + i} vertex before {worldMesh.vertices[i + vertIndex]}");
+            //print($"new vertex {vertIndex} : {newVertices[i]}");
+            worldMesh.vertices[i + vertIndex] = newVertices[i];
+            //print($"{vertIndex + i} vertex after {worldMesh.vertices[i + vertIndex]}");
+        }
 
-        m.triangles = m.triangles.Concat(newTriangles).ToArray();
-        print("tris added");
-        m.Optimize();
-        m.RecalculateNormals();
+        for (int i = 0; i < newTriangles.Length; i++)
+        {
+            print($"tris before {worldMesh.triangles[i + tIndex]}");
+            print($"new triangle {newTriangles[i]}");
+            worldMesh.triangles[i + tIndex] = newTriangles[i];
+            print($"tris after {worldMesh.triangles[i + tIndex]}");
+        }
     }
 
     public void SetVisibilityByWeight()
@@ -157,7 +127,6 @@ public class WorldBuilder : MonoBehaviour
             currentVoxel.SetActive(CompareAgainstWeightPoints(currentVoxel.transform.position));
         }
     }
-
 
     public bool CompareAgainstWeightPoints(Vector3 pos)
     {
@@ -175,24 +144,16 @@ public class WorldBuilder : MonoBehaviour
 
     IEnumerator MakeWorld()
     {
+        int voxelIndex = 0;
         for (int w = 0; w < width; w += gap)
         {
             for (int h = 0; h < height; h += gap)
             {
                 for (int d = 0; d < height; d += gap)
                 {
-                    //this is the first target for optimization,
-                    //  new objects shouldn't be created for each voxel,
-                    //  instead, a new set of vertices constructing a cube
-                    //  should be added to an existing mesh
-                    //GameObject newCube = CreateBox(new Vector3(w, h, d)); //GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    //newCube.transform.position = new Vector3(w, h, d);
-                    //if (mat != null)
-                    //{
-                    //    newCube.GetComponent<MeshRenderer>().material = mat;
-                    //}
-                    //voxelSet.Add(newCube);
-                    AddBoxToExistingMesh(worldMesh, new Vector3(w,h,d));
+                   
+                    AddBoxToExistingMesh(new Vector3(w,h,d),voxelIndex);
+                    voxelIndex++;
                 }
                 if (visualizeBuild)
                 {
@@ -201,7 +162,11 @@ public class WorldBuilder : MonoBehaviour
                 }
             }
         }
+        worldMesh.RecalculateBounds();
+        //worldMesh.Optimize();
+        worldMesh.RecalculateNormals();
         worldComplete = true;
+        print("world complete");
         //SetVisibilityByWeight();
         yield break;
 
